@@ -270,8 +270,8 @@ program DAMASK_grid
         enddo; write(IO_STDOUT,'(/)',advance='no')
       enddo
       if (any(loadCases(l)%stress%mask .eqv. loadCases(l)%deformation%mask)) errorID = 831
-      if (any(.not.(loadCases(l)%stress%mask .or. transpose(loadCases(l)%stress%mask)) .and. (math_I3<1))) &
-        errorID = 838                                                                               ! no rotation is allowed by stress BC
+      ! if (any(.not.(loadCases(l)%stress%mask .or. transpose(loadCases(l)%stress%mask)) .and. (math_I3<1))) &
+      !   errorID = 838                                                                               ! no rotation is allowed by stress BC
 
       if (loadCases(l)%stress%myType == 'P')     print'(2x,a)', 'P / MPa:'
       if (loadCases(l)%stress%myType == 'dot_P') print'(2x,a)', 'dot_P / MPa/s:'
@@ -351,6 +351,13 @@ program DAMASK_grid
   loadCaseLooping: do l = 1, size(loadCases)
     t_0 = t                                                                                         ! load case start time
     guess = loadCases(l)%estimate_rate                                                              ! change of load case? homogeneous guess for the first inc
+
+    loadCases(l)%deformation%mask(2,1) = .false.
+    loadCases(l)%deformation%mask(3,1) = .false.
+    loadCases(l)%deformation%mask(3,2) = .false.
+    loadCases(l)%stress%mask(2,1) = .true.
+    loadCases(l)%stress%mask(3,1) = .true.
+    loadCases(l)%stress%mask(3,2) = .true.
 
     incLooping: do inc = 1, loadCases(l)%N
       totalIncsCounter = totalIncsCounter + 1
@@ -493,7 +500,7 @@ program DAMASK_grid
         if (err_MPI /= 0_MPI_INTEGER_KIND) error stop 'MPI error'
         if (signal) exit loadCaseLooping
       endif skipping
-
+      ! if (inc == 2) error stop 'MPI error'  !when we only want the simulation to run for 2 increments
     enddo incLooping
 
   enddo loadCaseLooping

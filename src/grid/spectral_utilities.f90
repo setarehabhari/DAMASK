@@ -750,10 +750,10 @@ function utilities_maskedCompliance(rot_BC,mask_stress,C)
     temp99_real = math_3333to99(rot_BC%rotate(C))
 
     if (debugGeneral) then
-      print'(/,1x,a)', '... updating masked compliance ............................................'
-      print'(/,1x,a,/,8(9(2x,f12.7,1x)/),9(2x,f12.7,1x))', &
+    print'(/,1x,a)', '... updating masked compliance ............................................'
+    print'(/,1x,a,/,8(9(2x,f12.7,1x)/),9(2x,f12.7,1x))', &
         'Stiffness C (load) / GPa =', transpose(temp99_Real)*1.0e-9_pReal
-      flush(IO_STDOUT)
+    flush(IO_STDOUT)
     end if
 
     do i = 1,9; do j = 1,9
@@ -831,7 +831,8 @@ subroutine utilities_constitutiveResponse(P,P_av,C_volAvg,C_minmaxAvg,&
   real(pReal),    intent(in)                                        :: Delta_t                      !< loading time
   type(tRotation), intent(in),  optional                            :: rotation_BC                  !< rotation of load frame
 
-
+  integer :: i ,j,k
+  
   integer :: i
   integer(MPI_INTEGER_KIND) :: err_MPI
   real(pReal), dimension(3,3,3,3) :: dPdF_max,      dPdF_min
@@ -850,6 +851,13 @@ subroutine utilities_constitutiveResponse(P,P_av,C_volAvg,C_minmaxAvg,&
     call homogenization_mechanical_response2(Delta_t,[1,1],[1,product(cells(1:2))*cells3])
 
   P = reshape(homogenization_P, [3,3,cells(1),cells(2),cells3])
+   do i = 1 , cells(1)
+    do j = 1, cells(2)
+      do k = 1, cells3
+        P(2,1,i, j, k) = P(1,2,i, j, k)
+        P(3,1,i, j, k) = P(1,3,i, j, k)
+        P(3,2,i, j, k) = P(2,3,i, j, k)
+  end do;end do; end do 
   P_av = sum(sum(sum(P,dim=5),dim=4),dim=3) * wgt
   call MPI_Allreduce(MPI_IN_PLACE,P_av,9_MPI_INTEGER_KIND,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD,err_MPI)
   if (err_MPI /= 0_MPI_INTEGER_KIND) error stop 'MPI error'

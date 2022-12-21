@@ -305,6 +305,9 @@ function grid_mechanical_spectral_basic_solution(incInfoIn) result(solution)
   solution%termIll = terminallyIll
   terminallyIll = .false.
   P_aim = merge(P_av,P_aim,params%stress_mask)
+  P_aim(2,1) = P_aim(1,2)
+  P_aim(3,1) = P_aim(1,3)
+  P_aim(3,2) = P_aim(2,3)
 
 end function grid_mechanical_spectral_basic_solution
 
@@ -341,7 +344,7 @@ subroutine grid_mechanical_spectral_basic_forward(cutBack,guess,Delta_t,Delta_t_
   else
     C_volAvgLastInc    = C_volAvg
     C_minMaxAvgLastInc = C_minMaxAvg
-
+    
     F_aimDot = merge(merge(.0_pReal,(F_aim-F_aim_lastInc)/Delta_t_old,stress_BC%mask),.0_pReal,guess) ! estimate deformation rate for prescribed stress components
     F_aim_lastInc = F_aim
 
@@ -357,6 +360,9 @@ subroutine grid_mechanical_spectral_basic_forward(cutBack,guess,Delta_t,Delta_t_
       F_aimDot = F_aimDot &
                + merge(.0_pReal,(deformation_BC%values - F_aim_lastInc)/t_remaining,deformation_BC%mask)
     end if
+    F_aimDot(2,1) = F_aimDot(1,2)
+    F_aimDot(3,1) = F_aimDot(1,3)
+    F_aimDot(3,2) = F_aimDot(2,3)
 
     Fdot = utilities_calculateRate(guess, &
                                    F_lastInc,reshape(F,[3,3,cells(1),cells(2),cells3]),Delta_t_old, &
@@ -373,12 +379,15 @@ subroutine grid_mechanical_spectral_basic_forward(cutBack,guess,Delta_t,Delta_t_
                                        + merge(.0_pReal,(stress_BC%values - P_aim)/t_remaining,stress_BC%mask)*Delta_t
   if (stress_BC%myType=='dot_P') P_aim = P_aim &
                                        + merge(.0_pReal,stress_BC%values,stress_BC%mask)*Delta_t
-
+  
+  P_aim(2,1) = P_aim(1,2)
+  P_aim(3,1) = P_aim(1,3)
+  P_aim(3,2) = P_aim(2,3)
   F = reshape(utilities_forwardField(Delta_t,F_lastInc,Fdot, &                                      ! estimate of F at end of time+Delta_t that matches rotated F_aim on average
               rotation_BC%rotate(F_aim,active=.true.)),[9,cells(1),cells(2),cells3])
   call DMDAVecRestoreArrayF90(da,solution_vec,F,err_PETSc)
   CHKERRQ(err_PETSc)
-
+  
 !--------------------------------------------------------------------------------------------------
 ! set module wide available data
   params%stress_mask = stress_BC%mask
@@ -539,9 +548,21 @@ subroutine formResidual(in, F, &
 
 !--------------------------------------------------------------------------------------------------
 ! stress BC handling
+  print *, 'Pafter'
+  print'(/,1x,a,/,8(3(2x,f12.9,1x)/),3(2x,f12.9,1x))', &
+      'P_av =', P_av*1.0e-6_pReal
+  print'(/,1x,a,/,8(3(2x,f12.9,1x)/),3(2x,f12.9,1x))', &
+      'P_aim =', P_aim*1.0e-6_pReal
+  
+  
+
   deltaF_aim = math_mul3333xx33(S, P_av - P_aim)                                                    ! S = 0.0 for no bc
+  deltaF_aim(2,1) = deltaF_aim(1,2)
+  deltaF_aim(3,1) = deltaF_aim(1,3)
+  deltaF_aim(3,2) = deltaF_aim(2,3)
   F_aim = F_aim - deltaF_aim
-  err_BC = maxval(abs(merge(.0_pReal,P_av - P_aim,params%stress_mask)))
+  err_BC = maxval(abs(merge(.0_pReal,P_av - P_aim,params%stress_mask))) ! here since the bottem half is being replaced by 0 and
+                          ! its taking the maximum element its fine to let the bottom half remain zero since the result will be the same
 
 !--------------------------------------------------------------------------------------------------
 ! updated deformation gradient using fix point algorithm of basic scheme
@@ -555,7 +576,7 @@ subroutine formResidual(in, F, &
 !--------------------------------------------------------------------------------------------------
 ! constructing residual
   r = tensorField_real(1:3,1:3,1:cells(1),1:cells(2),1:cells3)                                      ! Gamma*P gives correction towards div(P) = 0, so needs to be zero, too
-
+       
 end subroutine formResidual
 
 
